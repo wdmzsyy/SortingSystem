@@ -5,6 +5,7 @@
 #include<cstdlib>   //rand()
 #include<ctime>
 using namespace std;
+//测试提交功能
 enum DataType {TYPE_INT, TYPE_DOUBLE};
 DataType currentDataType = TYPE_INT;    //默认一下
 
