@@ -4,14 +4,14 @@
 #include<sstream>   //添加sstream用于字符串分隔
 #include<cstdlib>   //rand()
 #include<ctime>
+#include<type_traits>
 using namespace std;
-//测试提交功能
-enum DataType {TYPE_INT, TYPE_DOUBLE};
+enum DataType {TYPE_INT, TYPE_DOUBLE, TYPE_STRING};
 DataType currentDataType = TYPE_INT;    //默认一下
 
 void mainMenu() {
     cout << "\n===== 排序系统 =====" << endl;
-    cout << "当前数据类型: " << (currentDataType == TYPE_INT ? "整数" : "浮点数") << endl;
+    cout << "当前数据类型: " << (currentDataType == TYPE_INT ? "整数" : (currentDataType == TYPE_DOUBLE ?"浮点数":"字符串")) << endl;
     cout << "1.选择数据类型" << endl;
     cout << "2.输入数据" << endl;
     cout << "3.选择排序算法并执行" << endl;
@@ -35,6 +35,7 @@ void selectDataType() {
     cout << "\n===== 选择数据类型 =====" << endl;
     cout << "1.整数（int）" << endl;
     cout << "2.浮点数（double）" << endl;
+    cout << "3.字符串（string）" << endl;
     cout << "请选择: ";
     int choice = 1;
     cin >> choice;
@@ -47,6 +48,10 @@ void selectDataType() {
         currentDataType = TYPE_DOUBLE;
         cout << "已切换到浮点数类型" << endl;
     }
+    else if (choice == 3) {
+        currentDataType = TYPE_STRING;
+        cout << "已切换到字符串类型" << endl;
+    }
     else {
         cout << "无效选择，保持当前类型" << endl;
     }
@@ -55,8 +60,18 @@ void selectDataType() {
 //输入数据
 template<typename T>
 vector<T> inputNumbers() {
-    cout << "请输入" << (typeid(T) == typeid(int) ? "整数":"浮点数")
-         << "（空格分隔，回车结束）: ";
+    string typeName;
+    if constexpr (is_same_v<T, int>) {
+        typeName = "整数";
+    }
+    else if constexpr (is_same_v<T, double>) {
+        typeName = "浮点数";
+    }
+    else if constexpr (is_same_v<T, string>) {
+        typeName = "字符串";
+    }
+    cout << "请输入" << typeName << "（空格分隔，回车结束）: ";
+    
     vector<T> nums;  // 创建一个空数组
     string line;
     getline(cin, line); //读取一整行，包含回车
@@ -93,7 +108,7 @@ void bubbleSort(vector<T>& numbers) {	//引用传递比值传递好，只用传�
     for (int i = 0; i < n; i++) {
         for (int j = 0; j < n - i - 1; j++) {
             if (numbers[j] > numbers[j + 1]) {
-                int temp = numbers[j];
+                T temp = numbers[j];
                 numbers[j] = numbers[j + 1];
                 numbers[j + 1] = temp;
             }
@@ -227,24 +242,38 @@ void mergeSort(vector<T>& arr, int left = 0, int right = -1) {
 int main()	//放最后,就先不写声明了
 {
     srand(time(nullptr));
-    cout << "欢迎使用排序系统（支持整数/浮点数）" << endl;
+    cout << "欢迎使用排序系统（支持整数/浮点数/字符串）" << endl;
     vector<int> intNumbers;      // 存储整数数据
     vector<double> doubleNumbers; // 存储浮点数数据
+    vector<string> stringNumbers;
   
     int mainChoice = 0;
     do {
         mainMenu();
-        cin >> mainChoice;
+        if (!(cin >> mainChoice)) { //如果读取到的不是数字的话-》删除
+            cin.clear();
+            cin.ignore(1000, '\n');
+            cout << "请输入数字" << endl;
+            continue;
+        }
         cin.ignore();
+
         switch (mainChoice) {
         case 1: selectDataType(); break;
         case 2: 
-            if (currentDataType == TYPE_INT) { intNumbers = inputNumbers<int>(); }
-            else { doubleNumbers = inputNumbers<double>(); }
+            if (currentDataType == TYPE_INT) {
+                intNumbers = inputNumbers<int>();
+            }
+            else if (currentDataType == TYPE_DOUBLE) {
+                doubleNumbers = inputNumbers<double>();
+            }
+            else {
+                stringNumbers = inputNumbers<string>();
+            }
             break;
         case 3:
         {
-            if ((currentDataType == TYPE_INT && intNumbers.empty()) || (currentDataType == TYPE_DOUBLE && doubleNumbers.empty())) {
+            if ((currentDataType == TYPE_INT && intNumbers.empty()) || (currentDataType == TYPE_DOUBLE && doubleNumbers.empty()) || (currentDataType == TYPE_STRING && stringNumbers.empty())) {
                 cout << "错误！请先输入数据！" << endl;
                 break;
             }
@@ -271,7 +300,7 @@ int main()	//放最后,就先不写声明了
                 outputNumbers(numbersToSort);
                 break;
             }
-            else {
+            else if (currentDataType == TYPE_DOUBLE) {
                 outputNumbers(doubleNumbers);
                 vector<double> numbersToSort = doubleNumbers;
                 cout << "正在使用";
@@ -288,14 +317,35 @@ int main()	//放最后,就先不写声明了
                 outputNumbers(numbersToSort);
                 break;
             }
+            else {
+                outputNumbers(stringNumbers);
+                vector<string> stringsToSort = stringNumbers;
+                cout << "正在使用";
+
+                switch (sortChoice) {
+                case 1: cout << "冒泡排序"; bubbleSort(stringsToSort); break;
+                case 2: cout << "插入排序"; insertionSort(stringsToSort); break;
+                case 3: cout << "选择排序"; selectionSort(stringsToSort); break;
+                case 4: cout << "快速排序"; quickSort(stringsToSort); break;
+                case 5: cout << "归并排序"; mergeSort(stringsToSort); break;
+                default: cout << "无效选择"; continue;
+                }
+                cout << "进行排序……" << endl;
+                cout << "排序后：";
+                outputNumbers(stringsToSort);
+                break;
+            }
         }
         case 4: 
             cout << "\n当前数据：";
             if (currentDataType == TYPE_INT) {
                 outputNumbers(intNumbers);
             }
-            else {
+            else if (currentDataType == TYPE_DOUBLE) {
                 outputNumbers(doubleNumbers);
+            }
+            else { 
+                outputNumbers(stringNumbers);
             }
             break;
         case 0:
