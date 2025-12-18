@@ -6,6 +6,8 @@
 #include<ctime>
 #include<type_traits>
 #include<chrono>
+#include<cmath>     //isfinite()检查浮点数
+#include<limits>    //用于数值范围常量
 using namespace std;
 enum DataType {TYPE_INT, TYPE_DOUBLE, TYPE_STRING};
 DataType currentDataType = TYPE_INT;    //默认一下
@@ -58,7 +60,39 @@ void selectDataType() {
     }
 }
 
-//输入数据
+bool validateInt(int value) {
+    const int MIN_INT = numeric_limits<int>::min();  // -2147483648
+    const int MAX_INT = numeric_limits<int>::max();  // 2147483647
+    if (value < MIN_INT || value > MAX_INT) {
+        cout << "警告：整数 " << value << " 可能超出处理范围" << endl;
+        return false;
+    }
+    return true;
+}
+
+bool validateDouble(double value) {
+    // 检查是否是特殊值：无穷大(inf)或非数字(nan)
+    if (!isfinite(value)) {
+        cout << "错误：浮点数 " << value << " 不是有效数值（可能是inf或nan）" << endl;
+        return false;
+    }
+    return true;
+}
+
+template<typename T>
+bool validateValue(const T& value) {
+    if constexpr (is_same_v<T, int>) {
+        return validateInt(value);
+    }
+    else if constexpr (is_same_v<T, double>) {
+        return validateDouble(value);
+    }
+    else {
+        // 未知类型，默认通过
+        return true;
+    }
+}
+
 template<typename T>
 vector<T> inputNumbers() {
     string typeName;
@@ -76,19 +110,91 @@ vector<T> inputNumbers() {
     vector<T> nums;  // 创建一个空数组
     string line;
     getline(cin, line); //读取一整行，包含回车
+    if (line.empty()) {
+        cout << "警告：没有输入任何内容！" << endl;
+        return nums;
+    }
     stringstream ss(line);//使用字符串流解析数字
     T num{};
-    while (ss >> num) {       //从字符串流中读取数字
-        nums.push_back(num);  // 添加到数组
+    int totalCount = 0;
+    int validCount = 0;
+
+    if constexpr (is_same_v<T, int>) {
+        string token;
+        while (ss >> token) {
+            totalCount++;
+            try {
+                // 使用stoi，它会抛出异常如果转换失败
+                int num = stoi(token);
+                if (validateValue(num)) {
+                    nums.push_back(num);
+                    validCount++;
+                }
+                else {
+                    cout << "  位置" << totalCount << "的数据 '" << token << "' 被跳过" << endl;
+                }
+            }
+            catch (const invalid_argument& e) {
+                cout << "  位置" << totalCount << "的数据 '" << token << "' 不是有效整数" << endl;
+            }
+            catch (const out_of_range& e) {
+                cout << "  位置" << totalCount << "的数据 '" << token << "' 超出整数范围" << endl;
+            }
+        }
     }
-    if (nums.empty()) {
-        cout << "警告：没有输入任何数据！！！" << endl;
+    else if constexpr (is_same_v<T, double>) {
+        string token;
+        while (ss >> token) {
+            totalCount++;
+
+            try {
+                // 使用stod转换，它会处理inf和nan
+                double num = stod(token);
+
+                // 验证转换后的值
+                if (validateValue(num)) {
+                    nums.push_back(num);
+                    validCount++;
+                }
+                else {
+                    cout << "  位置" << totalCount << "的数据 '" << token << "' 被跳过" << endl;
+                }
+            }
+            catch (const invalid_argument& e) {
+                cout << "  位置" << totalCount << "的数据 '" << token << "' 不是有效浮点数" << endl;
+            }
+            catch (const out_of_range& e) {
+                cout << "  位置" << totalCount << "的数据 '" << token << "' 超出浮点数范围" << endl;
+            }
+        }
     }
     else {
-        cout << "成功输入" << nums.size() << "个数据" << endl;
+        T num{};
+        while (ss >> num) {
+            totalCount++;
+            if (validateValue(num)) {
+                nums.push_back(num);
+                validCount++;
+            }
+            else {
+                cout << "  位置" << totalCount << "的数据被跳过" << endl;
+            }
+        }
     }
-    return nums; 
+
+    if (nums.empty()) {
+        cout << "警告：没有输入任何有效数据！" << endl;
+    }
+    else {
+        cout << "成功输入" << validCount << "个有效数据";
+        if (validCount < totalCount) {
+            cout << "（跳过 " << (totalCount - validCount) << " 个无效数据）";
+        }
+        cout << endl;
+    }
+    return nums;
 }
+
 template<typename T>
 void outputNumbers(const vector<T>& nums) {// const &：不修改数值
     if (nums.empty()) {
@@ -244,24 +350,36 @@ int main()	//放最后,就先不写声明了
 {
     srand(time(nullptr));
     cout << "欢迎使用排序系统（支持整数/浮点数/字符串）" << endl;
-    vector<int> intNumbers;      // 存储整数数据
-    vector<double> doubleNumbers; // 存储浮点数数据
+    vector<int> intNumbers;      
+    vector<double> doubleNumbers; 
     vector<string> stringNumbers;
   
     int mainChoice = 0;
     do {
         mainMenu();
-        if (!(cin >> mainChoice)) { //如果读取到的不是数字的话-》删除
-            cin.clear();
-            cin.ignore(1000, '\n');
-            cout << "请输入数字" << endl;
+        string input;
+        getline(cin, input);
+        if (input.empty()) {
+            cout << "请输入数字！" << endl;
             continue;
         }
-        cin.ignore();
+        stringstream ss(input);
+        if (!(ss >> mainChoice)) {
+            cout << "无效输入，请输入数字！" << endl;
+            continue;
+        }
+        string extra;
+        if (ss >> extra) {
+            cout << "注意：检测到额外输入 '" << extra << "'，请重新输入单数字选项！" << endl;
+            continue;  // 跳过本次循环，让用户重新输入
+        }
 
         switch (mainChoice) {
         case 1: selectDataType(); break;
         case 2: 
+            cout << "\n--- 输入数据 ---" << endl;
+            cout << "当前数据类型: " << (currentDataType == TYPE_INT ? "整数" :
+                (currentDataType == TYPE_DOUBLE ? "浮点数" : "字符串")) << endl;
             if (currentDataType == TYPE_INT) {
                 intNumbers = inputNumbers<int>();
             }
@@ -280,9 +398,27 @@ int main()	//放最后,就先不写声明了
             }
             int sortChoice = 0;
             sortingMenu();
-            cin >> sortChoice;
-            cin.ignore();
+            string sortInput;
+            getline(cin, sortInput);
             if (sortChoice == 0)break;
+            if (sortInput.empty()) {
+                cout << "请输入数字选择排序算法！" << endl;
+                break;
+            }
+            stringstream sortSS(sortInput);
+            if (!(sortSS >> sortChoice)) {
+                cout << "无效的排序算法选择！" << endl;
+                break;
+            }
+            string sortExtra;
+            if (sortSS >> sortExtra) {
+                cout << "注意：检测到额外输入 '" << sortExtra << "'，已忽略" << endl;
+            }
+            if (sortChoice == 0) {
+                cout << "返回上级菜单" << endl;
+                break;
+            }
+
             cout << "\n排序前：";
             if (currentDataType == TYPE_INT) {
                 outputNumbers(intNumbers);
@@ -315,6 +451,8 @@ int main()	//放最后,就先不写声明了
             }
             else if (currentDataType == TYPE_DOUBLE) {
                 outputNumbers(doubleNumbers);
+                long long sortTime = 0;
+                auto startTime = chrono::high_resolution_clock::now();
                 cout << "正在使用";
                 switch (sortChoice) {
                 case 1: cout << "冒泡排序"; bubbleSort(doubleNumbers); break;
@@ -327,22 +465,44 @@ int main()	//放最后,就先不写声明了
                 cout << " 进行排序..." << endl;
                 cout << "排序后: ";
                 outputNumbers(doubleNumbers);
+                auto endTime = chrono::high_resolution_clock::now();
+                sortTime = chrono::duration_cast<chrono::microseconds>(endTime - startTime).count();
+                cout << "\n=== 性能统计 ===" << endl;
+                cout << "排序耗时: " << sortTime << " 微秒，";
+                if (sortTime >= 1000000) {
+                    cout << "约 " << sortTime / 1000000.0 << " 秒" << endl;
+                }
+                else if (sortTime >= 1000) {
+                    cout << "约 " << sortTime / 1000.0 << " 毫秒" << endl;
+                }
                 break;
             }
             else {
                 outputNumbers(stringNumbers);
+                long long sortTime = 0;
+                auto startTime = chrono::high_resolution_clock::now();
                 cout << "正在使用";
                 switch (sortChoice) {
-                case 1: cout << "冒泡排序"; bubbleSort(stringNumbers); break;
-                case 2: cout << "插入排序"; insertionSort(stringNumbers); break;
+                case 1: cout << "冒泡排序（稳定）"; bubbleSort(stringNumbers); break;
+                case 2: cout << "插入排序（稳定）"; insertionSort(stringNumbers); break;
                 case 3: cout << "选择排序（不稳定）"; selectionSort(stringNumbers); break;
                 case 4: cout << "快速排序（不稳定）"; quickSort(stringNumbers); break;
-                case 5: cout << "归并排序"; mergeSort(stringNumbers); break;
+                case 5: cout << "归并排序（稳定）"; mergeSort(stringNumbers); break;
                 default: cout << "无效选择"; continue;
                 }
                 cout << "进行排序……" << endl;
                 cout << "排序后：";
                 outputNumbers(stringNumbers);
+                auto endTime = chrono::high_resolution_clock::now();
+                sortTime = chrono::duration_cast<chrono::microseconds>(endTime - startTime).count();
+                cout << "\n=== 性能统计 ===" << endl;
+                cout << "排序耗时: " << sortTime << " 微秒，";
+                if (sortTime >= 1000000) {
+                    cout << "约 " << sortTime / 1000000.0 << " 秒" << endl;
+                }
+                else if (sortTime >= 1000) {
+                    cout << "约 " << sortTime / 1000.0 << " 毫秒" << endl;
+                }
                 break;
             }
         }
