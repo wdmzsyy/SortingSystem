@@ -5,6 +5,7 @@
 #include<cstdlib>   //rand()
 #include<ctime>
 #include<type_traits>
+#include<chrono>
 using namespace std;
 enum DataType {TYPE_INT, TYPE_DOUBLE, TYPE_STRING};
 DataType currentDataType = TYPE_INT;    //默认一下
@@ -285,59 +286,68 @@ int main()	//放最后,就先不写声明了
             cout << "\n排序前：";
             if (currentDataType == TYPE_INT) {
                 outputNumbers(intNumbers);
-                vector<int>numbersToSort = intNumbers;
+
+                long long sortTime = 0;
+                auto startTime = chrono::high_resolution_clock::now();
                 cout << "正在使用";
                 switch (sortChoice) {
-                case 1: cout << "冒泡排序"; bubbleSort(numbersToSort); break;
-                case 2: cout << "插入排序"; insertionSort(numbersToSort); break;
-                case 3: cout << "选择排序"; selectionSort(numbersToSort); break;
-                case 4: cout << "快速排序"; quickSort(numbersToSort); break;
-                case 5: cout << "归并排序"; mergeSort(numbersToSort); break;
+                case 1: cout << "冒泡排序"; bubbleSort(intNumbers); break;
+                case 2: cout << "插入排序"; insertionSort(intNumbers); break;
+                case 3: cout << "选择排序（不稳定）"; selectionSort(intNumbers); break;
+                case 4: cout << "快速排序（不稳定）"; quickSort(intNumbers); break;
+                case 5: cout << "归并排序"; mergeSort(intNumbers); break;
                 default: cout << "无效选择"; continue;
                 }
                 cout << "进行排序……" << endl;
                 cout << "排序后：";
-                outputNumbers(numbersToSort);
+                outputNumbers(intNumbers);
+                auto endTime = chrono::high_resolution_clock::now();
+                sortTime = chrono::duration_cast<chrono::microseconds>(endTime - startTime).count();
+                cout << "\n=== 性能统计 ===" << endl;
+                cout << "排序耗时: " << sortTime << " 微秒，";
+                if (sortTime >= 1000000) {
+                    cout << "约 " << sortTime / 1000000.0 << " 秒" << endl;
+                }
+                else if (sortTime >= 1000) {
+                    cout << "约 " << sortTime / 1000.0 << " 毫秒" << endl;
+                }
                 break;
             }
             else if (currentDataType == TYPE_DOUBLE) {
                 outputNumbers(doubleNumbers);
-                vector<double> numbersToSort = doubleNumbers;
                 cout << "正在使用";
                 switch (sortChoice) {
-                case 1: cout << "冒泡排序"; bubbleSort(numbersToSort); break;
-                case 2: cout << "插入排序"; insertionSort(numbersToSort); break;
-                case 3: cout << "选择排序"; selectionSort(numbersToSort); break;
-                case 4: cout << "快速排序"; quickSort(numbersToSort); break;
-                case 5: cout << "归并排序"; mergeSort(numbersToSort); break;
-                default: cout << "无效选择"; continue;
+                case 1: cout << "冒泡排序"; bubbleSort(doubleNumbers); break;
+                case 2: cout << "插入排序"; insertionSort(doubleNumbers); break;
+                case 3: cout << "选择排序（不稳定）"; selectionSort(doubleNumbers); break;
+                case 4: cout << "快速排序（不稳定）"; quickSort(doubleNumbers); break;
+                case 5: cout << "归并排序"; mergeSort(doubleNumbers); break;
+                numbersToSortdefault: cout << "无效选择"; continue;
                 }
                 cout << " 进行排序..." << endl;
                 cout << "排序后: ";
-                outputNumbers(numbersToSort);
+                outputNumbers(doubleNumbers);
                 break;
             }
             else {
                 outputNumbers(stringNumbers);
-                vector<string> stringsToSort = stringNumbers;
                 cout << "正在使用";
-
                 switch (sortChoice) {
-                case 1: cout << "冒泡排序"; bubbleSort(stringsToSort); break;
-                case 2: cout << "插入排序"; insertionSort(stringsToSort); break;
-                case 3: cout << "选择排序"; selectionSort(stringsToSort); break;
-                case 4: cout << "快速排序"; quickSort(stringsToSort); break;
-                case 5: cout << "归并排序"; mergeSort(stringsToSort); break;
+                case 1: cout << "冒泡排序"; bubbleSort(stringNumbers); break;
+                case 2: cout << "插入排序"; insertionSort(stringNumbers); break;
+                case 3: cout << "选择排序（不稳定）"; selectionSort(stringNumbers); break;
+                case 4: cout << "快速排序（不稳定）"; quickSort(stringNumbers); break;
+                case 5: cout << "归并排序"; mergeSort(stringNumbers); break;
                 default: cout << "无效选择"; continue;
                 }
                 cout << "进行排序……" << endl;
                 cout << "排序后：";
-                outputNumbers(stringsToSort);
+                outputNumbers(stringNumbers);
                 break;
             }
         }
         case 4: 
-            cout << "\n当前数据：";
+            cout << "当前数据：";
             if (currentDataType == TYPE_INT) {
                 outputNumbers(intNumbers);
             }
