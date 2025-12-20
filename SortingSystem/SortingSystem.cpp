@@ -8,6 +8,7 @@
 #include<chrono>
 #include<cmath>     //isfinite()检查浮点数
 #include<limits>    //用于数值范围常量
+#include<fstream>
 using namespace std;
 enum DataType { TYPE_INT, TYPE_DOUBLE, TYPE_STRING };
 DataType currentDataType = TYPE_INT;    //默认一下
@@ -21,6 +22,7 @@ void mainMenu() {
     cout << "2.输入数据" << endl;
     cout << "3.选择排序算法并执行" << endl;
     cout << "4.显示当前数据" << endl;
+    cout << "5.文件操作（保存/加载）" << endl;
     cout << "0.退出系统" << endl;
     cout << "请选择: ";
 }
@@ -389,6 +391,127 @@ void mergeSort(vector<T>& arr, SortOrder order = ORDER_ASC, int left = 0, int ri
     merge(arr, left, mid, right, order);
 }
 
+template<typename T>
+void saveToFile(const vector<T>& data, const string& filename) {
+    ifstream testFile(filename);
+    if (testFile.is_open()) {
+        testFile.close();
+        cout << "文件 " << filename << " 已存在，覆盖吗？(y/n): ";
+        string answer;
+        getline(cin, answer);
+        if (answer != "y" && answer != "Y") {
+            cout << "取消保存" << endl;
+            return;  // 用户选择不覆盖，直接结束函数
+        }
+        cout << "将覆盖原文件" << endl;
+    }
+    
+    ofstream file(filename);  // 创建一个叫filename的文件
+    if (!file.is_open()) {    
+        cout << "错误：无法创建文件!" << filename << endl;
+        return; 
+    }
+
+    if constexpr (is_same_v<T, int>) {
+        file << "INT" << endl;     
+    }
+    else if constexpr (is_same_v<T, double>) {
+        file << "DOUBLE" << endl;   
+    }
+    else if constexpr (is_same_v<T, string>) {
+        file << "STRING" << endl; 
+    }
+
+    file << data.size() << endl; 
+
+    for (const auto& item : data) {
+        file << item << " ";  
+    }
+    file << endl;  // 最后换行
+
+    cout << "数据已保存到 " << filename
+        << "（" << data.size() << " 个元素）" << endl;
+}
+
+template<typename T>
+vector<T> loadFromFile(const string& filename) {
+    vector<T> data; //空数组，为了保存加载出来的数据
+    ifstream file(filename);
+    if (!file.is_open()) {
+        cout << "错误：找不到文件 " << filename << endl;
+        return data;  // 返回空数组
+    }
+
+    string fileType;
+    file >> fileType;  
+
+    string expectedType;    //验证一下数据类型是否正确
+    if constexpr (is_same_v<T, int>) {
+        expectedType = "INT";
+    }
+    else if constexpr (is_same_v<T, double>) {
+        expectedType = "DOUBLE";
+    }
+    else if constexpr (is_same_v<T, string>) {
+        expectedType = "STRING";
+    }
+
+    if (fileType != expectedType) {
+        cout << "错误：文件类型不匹配！" << endl;
+        cout << "   文件里是: " << fileType << endl;
+        cout << "   但当前需要: " << expectedType << endl;
+        return data;  // 返回空数组
+    }
+
+    size_t count;
+    file >> count;
+    data.resize(count);  // 把数组大小设为count
+    for (size_t i = 0; i < count; i++) {
+        file >> data[i];  
+    }
+
+    cout << "从 " << filename << " 加载了 " << count << " 个数据" << endl;
+    return data;
+}
+
+template<typename T>
+void askToSaveSortedData(const vector<T>& data, DataType type) {
+    cout << "\n=== 是否保存排序结果？ ===" << endl;
+    cout << "1. 保存到文件" << endl;
+    cout << "2. 不保存，继续操作" << endl;
+    cout << "请选择 (直接回车不保存): ";
+
+    string choiceInput;
+    getline(cin, choiceInput);
+    if (choiceInput.empty()) {
+        cout << "排序结果未保存" << endl;
+        return;
+    }
+    int choice = 0;
+    stringstream ss(choiceInput);
+    if (!(ss >> choice) || choice != 1) {
+        cout << "排序结果未保存" << endl;
+        return;
+    }
+
+    cout << "请输入文件名（直接回车使用默认名）: ";
+    string filename;
+    getline(cin, filename);
+    if (filename.empty()) {
+        if (type == TYPE_INT) {
+            filename = "sorted_int.txt";
+        }
+        else if (type == TYPE_DOUBLE) {
+            filename = "sorted_double.txt";
+        }
+        else {
+            filename = "sorted_string.txt";
+        }
+        cout << "使用默认文件名: " << filename << endl;
+    }
+    saveToFile(data, filename);
+}
+
 int main()	//放最后,就先不写声明了
 {
     srand(time(nullptr));
@@ -513,6 +636,7 @@ int main()	//放最后,就先不写声明了
                 auto endTime = chrono::high_resolution_clock::now();
                 sortTime = chrono::duration_cast<chrono::microseconds>(endTime - startTime).count();
                 cout << "性能统计：排序耗时 " << sortTime << " 微秒" << endl;
+                askToSaveSortedData(intNumbers, TYPE_INT);
                 break;
             }
             else if (currentDataType == TYPE_DOUBLE) {
@@ -526,14 +650,15 @@ int main()	//放最后,就先不写声明了
                 case 3: cout << "选择排序（不稳定）"; selectionSort(doubleNumbers, currentOrder); break;
                 case 4: cout << "快速排序（不稳定）"; quickSort(doubleNumbers, currentOrder); break;
                 case 5: cout << "归并排序（稳定）"; mergeSort(doubleNumbers, currentOrder); break;
-                numbersToSortdefault: cout << "无效选择"; continue;
+                default: cout << "无效选择"; continue;
                 }
-                cout << " 进行排序..." << endl;
+                cout << " 进行排序……" << endl;
                 cout << "排序后: ";
                 outputNumbers(doubleNumbers);
                 auto endTime = chrono::high_resolution_clock::now();
                 sortTime = chrono::duration_cast<chrono::microseconds>(endTime - startTime).count();
                 cout << "性能统计：排序耗时 " << sortTime << " 微秒" << endl;
+                askToSaveSortedData(doubleNumbers, TYPE_DOUBLE);
                 break;
             }
             else {
@@ -555,9 +680,10 @@ int main()	//放最后,就先不写声明了
                 auto endTime = chrono::high_resolution_clock::now();
                 sortTime = chrono::duration_cast<chrono::microseconds>(endTime - startTime).count();
                 cout << "性能统计：排序耗时 " << sortTime << " 微秒" << endl;
+                askToSaveSortedData(stringNumbers, TYPE_STRING);
                 break;
             }
-        }
+        } break;
         case 4:
             cout << "当前数据：";
             if (currentDataType == TYPE_INT) {
@@ -570,10 +696,139 @@ int main()	//放最后,就先不写声明了
                 outputNumbers(stringNumbers);
             }
             break;
+
+        case 5:
+        {
+            int fileChoice;
+            do {
+                cout << "\n===== 文件操作菜单 =====" << endl;
+                cout << "1. 保存当前数据到文件" << endl;
+                cout << "2. 从文件加载数据" << endl;
+                cout << "3. 保存排序结果" << endl;
+                cout << "0. 返回主菜单" << endl;
+                cout << "请选择: ";
+
+                string fileInput;
+                getline(cin, fileInput);
+                if (fileInput.empty()) {
+                    cout << "请输入数字！" << endl;
+                    continue;
+                }
+                stringstream fileSS(fileInput);
+                if (!(fileSS >> fileChoice)) {
+                    cout << "无效输入！" << endl;
+                    continue;
+                }
+
+                switch (fileChoice) {
+                case 1:  // 保存当前数据
+                {
+                    cout << "请输入要保存的文件名（例如: data.txt）: ";
+                    string filename;
+                    getline(cin, filename);
+                    if (filename.empty()) {
+                        cout << "文件名不能为空！" << endl;
+                        break;
+                    }
+
+                    if (currentDataType == TYPE_INT) {
+                        saveToFile(intNumbers, filename);   //intNumbers数组里的东西传进去
+                    }
+                    else if (currentDataType == TYPE_DOUBLE) {
+                        saveToFile(doubleNumbers, filename);
+                    }
+                    else {
+                        saveToFile(stringNumbers, filename);
+                    }
+                    break;
+                }
+
+                case 2:
+                {
+                    cout << "请输入要加载的文件名: ";
+                    string filename;
+                    getline(cin, filename);
+                    if (filename.empty()) {
+                        cout << "文件名不能为空！" << endl;
+                        break;
+                    }
+
+                    if (currentDataType == TYPE_INT) {
+                        intNumbers = loadFromFile<int>(filename);
+                        if (!intNumbers.empty()) {
+                            cout << "\n加载的数据: ";
+                            outputNumbers(intNumbers);
+                        }
+                    }
+                    else if (currentDataType == TYPE_DOUBLE) {
+                        doubleNumbers = loadFromFile<double>(filename);
+                        if (!doubleNumbers.empty()) {
+                            cout << "\n加载的数据: ";
+                            outputNumbers(doubleNumbers);
+                        }
+                    }
+                    else {
+                        stringNumbers = loadFromFile<string>(filename);
+                        if (!stringNumbers.empty()) {
+                            cout << "\n加载的数据: ";
+                            outputNumbers(stringNumbers);
+
+                        }
+                    }
+                    break;
+                }
+
+                case 3:
+                {
+                    cout << "请输入保存排序结果的文件名: ";
+                    string filename;
+                    getline(cin, filename);
+                    if (filename.empty()) {
+                        cout << "文件名不能为空！" << endl;
+                        break;
+                    }
+
+                    // 在文件名后加_sorted表示是排序后的结果
+                    string sortedFilename = filename;
+                    size_t dotPos = sortedFilename.find_last_of('.');
+                    if (dotPos != string::npos) {
+                        // 如果找到了点.，有扩展名，在扩展名前加_sorted
+                        sortedFilename.insert(dotPos, "_sorted");
+                    }
+                    else {
+                        sortedFilename += "_sorted";
+                    }
+
+                    if (currentDataType == TYPE_INT && !intNumbers.empty()) {
+                        saveToFile(intNumbers, sortedFilename);
+                    }
+                    else if (currentDataType == TYPE_DOUBLE && !doubleNumbers.empty()) {
+                        saveToFile(doubleNumbers, sortedFilename);
+                    }
+                    else if (currentDataType == TYPE_STRING && !stringNumbers.empty()) {
+                        saveToFile(stringNumbers, sortedFilename);
+                    }
+                    else {
+                        cout << "没有数据可保存！" << endl;
+                    }
+                    break;
+                }
+                case 0:
+                    cout << "返回主菜单..." << endl;
+                    break;
+
+                default:
+                    cout << "无效选择！" << endl;
+                }
+
+            } while (fileChoice != 0);
+            break;
+        }
+
         case 0:
             cout << "感谢使用，再见！" << endl;
             break;
-        default: cout << "无效选择，请重新输入！" << endl;
+        default: cout << "无效选择，请输入1-5之间的数字！" << endl;
         }
     } while (mainChoice != 0);
     cout << "按回车退出..." << endl;
