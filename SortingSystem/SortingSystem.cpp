@@ -9,7 +9,16 @@
 #include<cmath>     //isfinite()检查浮点数
 #include<limits>    //用于数值范围常量
 #include<fstream>
+#include <SFML/Graphics.hpp>
+#include <SFML/Window.hpp>
 using namespace std;
+
+sf::RenderWindow* visualWindow = nullptr;
+bool visualizationEnabled = false;
+const int WINDOW_WIDTH = 1200;  // 增加窗口宽度
+const int WINDOW_HEIGHT = 700;  // 增加窗口高度
+const int MIN_BAR_WIDTH = 2;    // 最小柱子宽度
+const int MAX_BAR_WIDTH = 20;   // 最大柱子宽度
 
 class SimpleSortException {
 private:
@@ -33,6 +42,7 @@ void mainMenu() {
     cout << "4.显示当前数据" << endl;
     cout << "5.文件操作（保存/加载）" << endl;
     cout << "6.查看算法复杂度" << endl;
+    cout << "7.启用/禁用可视化" << endl;
     cout << "0.退出系统" << endl;
     cout << "请选择: ";
 }
@@ -46,6 +56,161 @@ void sortingMenu() {
     cout << "5.归并排序（稳定）" << endl;
     cout << "0.返回上级菜单" << endl;
     cout << "请选择: ";
+}
+
+template<typename T>
+void drawVisualization(const vector<T>& data, int highlight1 = -1, int highlight2 = -1, int step = 0) {
+    if (!visualWindow || !visualizationEnabled) return;
+
+    // 处理窗口事件
+    sf::Event event;
+    while (visualWindow->pollEvent(event)) {
+        if (event.type == sf::Event::Closed) {
+            visualWindow->close();
+            delete visualWindow;
+            visualWindow = nullptr;
+            return;
+        }
+    }
+
+    // 清屏
+    visualWindow->clear(sf::Color(40, 44, 52)); 
+
+    if (data.empty()) return;
+
+    // 找到最大值用于归一化
+    double maxVal = 1.0;
+    if constexpr (is_same_v<T, int>) {
+        auto maxElement = max_element(data.begin(), data.end());
+        if (maxElement != data.end()) {
+            maxVal = static_cast<double>(*maxElement);
+        }
+    }
+    else if constexpr (is_same_v<T, double>) {
+        auto maxElement = max_element(data.begin(), data.end());
+        if (maxElement != data.end()) {
+            maxVal = *maxElement;
+        }
+    }
+    else {
+        // 对于字符串，使用长度
+        maxVal = 100.0; // 固定值
+    }
+
+    if (maxVal <= 0) maxVal = 1.0;
+
+    // 动态计算柱子宽度
+    int barCount = data.size();
+    float availableWidth = WINDOW_WIDTH - 20; // 留出边距
+    float barWidth = availableWidth / barCount;
+
+    // 限制柱子宽度范围
+    if (barWidth < MIN_BAR_WIDTH) barWidth = MIN_BAR_WIDTH;
+    if (barWidth > MAX_BAR_WIDTH) barWidth = MAX_BAR_WIDTH;
+
+    // 计算总宽度和起始位置，使柱子居中
+    float totalWidth = barCount * barWidth;
+    float startX = (WINDOW_WIDTH - totalWidth) / 2;
+
+    // 绘制所有柱子
+    for (int i = 0; i < barCount; i++) {
+        // 计算柱子的高度
+        float value = 0.0f;
+        if constexpr (is_same_v<T, int>) {
+            value = static_cast<float>(data[i]);
+        }
+        else if constexpr (is_same_v<T, double>) {
+            value = static_cast<float>(data[i]);
+        }
+        else {
+            value = static_cast<float>(data[i].length()) * 10.0f; // 字符串按长度显示
+        }
+
+        float height = (value / maxVal) * (WINDOW_HEIGHT - 100);
+        if (height < 2) height = 2;
+
+        // 创建柱子
+        sf::RectangleShape bar(sf::Vector2f(barWidth - 1, height));
+        bar.setPosition(startX + i * barWidth, WINDOW_HEIGHT - height - 50);
+
+        // 设置颜色：高亮或普通
+        if (i == highlight1 || i == highlight2) {
+            // 高亮颜色 - 红色表示比较或交换
+            bar.setFillColor(sf::Color(220, 50, 47)); // 红色
+        }
+        else {
+            // 根据数值设置渐变色
+            float ratio = value / maxVal;
+            sf::Uint8 r = static_cast<sf::Uint8>(100 + ratio * 155);
+            sf::Uint8 g = static_cast<sf::Uint8>(150 + ratio * 105);
+            sf::Uint8 b = static_cast<sf::Uint8>(200 + ratio * 55);
+            bar.setFillColor(sf::Color(r, g, b));
+        }
+
+        visualWindow->draw(bar);
+    }
+
+    // 绘制基本信息（不使用字体，避免加载问题）
+    // 创建一个简单的矩形作为标题背景
+    sf::RectangleShape titleBg(sf::Vector2f(WINDOW_WIDTH, 30));
+    titleBg.setPosition(0, 0);
+    titleBg.setFillColor(sf::Color(60, 64, 72));
+    visualWindow->draw(titleBg);
+
+    // 绘制简单的图形表示信息
+    // 数据大小指示器
+    sf::RectangleShape sizeIndicator(sf::Vector2f(10, 10));
+    sizeIndicator.setPosition(10, 10);
+    sizeIndicator.setFillColor(sf::Color::White);
+    visualWindow->draw(sizeIndicator);
+
+    // 高亮说明
+    if (highlight1 >= 0 || highlight2 >= 0) {
+        sf::RectangleShape highlightIndicator(sf::Vector2f(10, 10));
+        highlightIndicator.setPosition(WINDOW_WIDTH - 120, 10);
+        highlightIndicator.setFillColor(sf::Color::Red);
+        visualWindow->draw(highlightIndicator);
+    }
+
+    // 绘制步骤计数器（使用简单的图形）
+    if (step > 0) {
+        // 绘制步骤指示器
+        for (int i = 0; i < min(step / 10, 20); i++) {
+            sf::RectangleShape stepDot(sf::Vector2f(3, 3));
+            stepDot.setPosition(150 + i * 5, 15);
+            stepDot.setFillColor(sf::Color::Green);
+            visualWindow->draw(stepDot);
+        }
+    }
+
+    visualWindow->display();
+
+    // 根据数据量调整延迟时间
+    int delay = 50; // 默认延迟
+    if (data.size() > 100) delay = 20;
+    if (data.size() > 500) delay = 5;
+    if (data.size() > 1000) delay = 1;
+
+    sf::sleep(sf::milliseconds(delay));
+}
+
+// 初始化可视化窗口
+void initVisualizationWindow() {
+    if (visualWindow) {
+        delete visualWindow;
+    }
+    visualWindow = new sf::RenderWindow(sf::VideoMode(WINDOW_WIDTH, WINDOW_HEIGHT), "Sorting Visualization");
+    visualizationEnabled = true;
+}
+
+// 关闭可视化窗口
+void closeVisualizationWindow() {
+    if (visualWindow) {
+        visualWindow->close();
+        delete visualWindow;
+        visualWindow = nullptr;
+    }
+    visualizationEnabled = false;
 }
 
 void selectDataType() {
@@ -75,8 +240,8 @@ void selectDataType() {
 }
 
 bool validateInt(int value) {
-    const int MIN_INT = numeric_limits<int>::min();  // -2147483648
-    const int MAX_INT = numeric_limits<int>::max();  // 2147483647
+    const int MIN_INT = (numeric_limits<int>::min)();  // -2147483648
+    const int MAX_INT = (numeric_limits<int>::max)();  // 2147483647
     if (value < MIN_INT || value > MAX_INT) {
         cout << "警告：整数 " << value << " 可能超出处理范围" << endl;
         return false;
@@ -85,9 +250,8 @@ bool validateInt(int value) {
 }
 
 bool validateDouble(double value) {
-    // 检查是否是特殊值：无穷大(inf)或非数字(nan)
     if (!isfinite(value)) {
-        cout << "错误：浮点数 " << value << " 不是有效数值（可能是inf或nan）" << endl;
+        cout << "错误：浮点数 " << value << " 不是有效数值" << endl;
         return false;
     }
     return true;
@@ -228,14 +392,10 @@ void checkMemorySafe(const vector<T>& data) {
     }
 }
 
-// ============ 随机数生成函数 ============
 template<typename T>
 vector<T> generateRandomNumbers() {
-    vector<T> randomData;
-
-    // 询问生成数量
+    vector<T> randomData; 
     cout << "请输入要生成的随机数据数量 (1-10000): ";
-
     string input;
     getline(cin, input);
 
@@ -268,7 +428,7 @@ vector<T> generateRandomNumbers() {
         for (int i = 0; i < count; i++) {
             randomData.push_back(rand() % 1000);
         }
-        cout << "✓ 已生成 " << count << " 个随机整数" << endl;
+        cout << "已生成 " << count << " 个随机整数" << endl;
     }
     else if constexpr (is_same_v<T, double>) {
         // 生成随机浮点数，范围 0.0-99.99
@@ -278,7 +438,7 @@ vector<T> generateRandomNumbers() {
             double value = (rand() % 10000) / 100.0;
             randomData.push_back(value);
         }
-        cout << "✓ 已生成 " << count << " 个随机浮点数" << endl;
+        cout << "已生成 " << count << " 个随机浮点数" << endl;
     }
     else if constexpr (is_same_v<T, string>) {
         // 生成随机字符串
@@ -293,7 +453,7 @@ vector<T> generateRandomNumbers() {
             }
             randomData.push_back(randomStr);
         }
-        cout << "✓ 已生成 " << count << " 个随机字符串" << endl;
+        cout << "已生成 " << count << " 个随机字符串" << endl;
     }
 
     return randomData;
@@ -314,7 +474,123 @@ void outputNumbers(const vector<T>& nums) {// const &：不修改数值
 }
 
 template<typename T>
-void bubbleSort(vector<T>& numbers, SortOrder order = ORDER_ASC) {	//引用传递比值传递好，只用传地址
+void bubbleSortVisual(vector<T>& numbers, SortOrder order = ORDER_ASC) {
+    int n = numbers.size();
+    int step = 0;
+    for (int i = 0; i < n; i++) {
+        for (int j = 0; j < n - i - 1; j++) {
+            step++;
+            // 每10步绘制一次，减少绘制频率
+            if (step % 10 == 0) {
+                drawVisualization(numbers, j, j + 1, step);
+            }
+
+            bool shouldSwap = false;
+            if (order == ORDER_ASC) {
+                shouldSwap = numbers[j] > numbers[j + 1];
+            }
+            else {
+                shouldSwap = numbers[j] < numbers[j + 1];
+            }
+
+            if (shouldSwap) {
+                swap(numbers[j], numbers[j + 1]);
+                // 交换后绘制一次
+                if (step % 5 == 0) {
+                    drawVisualization(numbers, j, j + 1, step);
+                }
+            }
+        }
+        // 每轮结束后绘制一次
+        drawVisualization(numbers, -1, -1, step);
+    }
+}
+
+template<typename T>
+void insertionSortVisual(vector<T>& numbers, SortOrder order = ORDER_ASC) {
+    int n = numbers.size();
+    int step = 0;
+    for (int i = 1; i < n; i++) {
+        T key = numbers[i];
+        int j = i - 1;
+        step++;
+
+        if (step % 5 == 0) {
+            drawVisualization(numbers, i, j, step);
+        }
+
+        if (order == ORDER_ASC) {
+            while (j >= 0 && numbers[j] > key) {
+                numbers[j + 1] = numbers[j];
+                j--;
+                step++;
+                if (step % 10 == 0) {
+                    drawVisualization(numbers, j + 1, j, step);
+                }
+            }
+        }
+        else {
+            while (j >= 0 && numbers[j] < key) {
+                numbers[j + 1] = numbers[j];
+                j--;
+                step++;
+                if (step % 10 == 0) {
+                    drawVisualization(numbers, j + 1, j, step);
+                }
+            }
+        }
+        numbers[j + 1] = key;
+        if (step % 20 == 0) {
+            drawVisualization(numbers, j + 1, -1, step);
+        }
+    }
+}
+
+template<typename T>
+void selectionSortVisual(vector<T>& numbers, SortOrder order = ORDER_ASC) {
+    int n = numbers.size();
+    int step = 0;
+    for (int i = 0; i < n - 1; i++) {
+        int selectedIndex = i;
+
+        step++;
+        if (step % 10 == 0) {
+            drawVisualization(numbers, i, selectedIndex, step);
+        }
+
+        for (int j = i + 1; j < n; j++) {
+            step++;
+            if (step % 20 == 0) {
+                drawVisualization(numbers, selectedIndex, j, step);
+            }
+
+            if (order == ORDER_ASC) {
+                if (numbers[j] < numbers[selectedIndex]) {
+                    selectedIndex = j;
+                }
+            }
+            else {
+                if (numbers[j] > numbers[selectedIndex]) {
+                    selectedIndex = j;
+                }
+            }
+        }
+        if (selectedIndex != i) {
+            swap(numbers[i], numbers[selectedIndex]);
+            step++;
+            if (step % 10 == 0) {
+                drawVisualization(numbers, i, selectedIndex, step);
+            }
+        }
+        // 每轮结束后绘制一次
+        if (i % 5 == 0) {
+            drawVisualization(numbers, -1, -1, step);
+        }
+    }
+}
+
+template<typename T>
+void bubbleSort(vector<T>& numbers, SortOrder order = ORDER_ASC) {
     int n = numbers.size();
     for (int i = 0; i < n; i++) {
         for (int j = 0; j < n - i - 1; j++) {
@@ -419,11 +695,11 @@ void quickSort(vector<T>& numbers, SortOrder order = ORDER_ASC, int low = 0, int
         // 总是先递归处理较短的部分
         if (pivotPos - low < high - pivotPos) {
             quickSort(numbers, order, low, pivotPos - 1);
-            low = pivotPos + 1;  
+            low = pivotPos + 1;
         }
         else {
             quickSort(numbers, order, pivotPos + 1, high);
-            high = pivotPos - 1; 
+            high = pivotPos - 1;
         }
     }
 }
@@ -440,7 +716,7 @@ void merge(vector<T>& arr, int left, int mid, int right, SortOrder order) {
     while (i <= mid && j <= right) {
         if (order == ORDER_ASC) {
             if (arr[i] <= arr[j]) {
-               temp[k++] = arr[i++];
+                temp[k++] = arr[i++];
             }
             else {
                 temp[k++] = arr[j++];
@@ -654,8 +930,7 @@ void showAlgorithmComplexity() {
     cout << "     稳定性：稳定" << endl;
 }
 
-int main()	//放最后,就先不写声明了
-{
+int main() {
     srand(time(nullptr));
     cout << "欢迎使用排序系统（支持整数/浮点数/字符串）" << endl;
     vector<int> intNumbers;
@@ -819,36 +1094,91 @@ int main()	//放最后,就先不写声明了
                     cout << "使用默认升序" << endl;
                 }
 
+                bool useVisualization = false;
+                if (visualizationEnabled && currentDataType == TYPE_INT) {
+                    cout << "\n启用可视化？(y/n，或者直接回车启用): ";
+                    string visInput;
+                    getline(cin, visInput);
+                    if (visInput.empty() || visInput == "y" || visInput == "Y") {
+                        useVisualization = true;
+                        cout << "已启用可视化……将弹出窗口显示排序过程" << endl;
+                        cout << "注意：可视化窗口会在排序结束后自动关闭" << endl;
+                    }
+                }
+
                 cout << "\n排序前：";
                 try {
                     if (currentDataType == TYPE_INT) {
                         outputNumbers(intNumbers);
-                        checkMemorySafe(intNumbers); 
-                        cout << "正在使用";
+                        checkMemorySafe(intNumbers);
 
                         long long sortTime = 0;
                         auto startTime = chrono::high_resolution_clock::now();
-                        switch (sortChoice) {
-                        case 1: cout << "冒泡排序（稳定）"; bubbleSort(intNumbers, currentOrder); break;
-                        case 2: cout << "插入排序（稳定）"; insertionSort(intNumbers, currentOrder); break;
-                        case 3: cout << "选择排序（不稳定）"; selectionSort(intNumbers, currentOrder); break;
-                        case 4: cout << "快速排序（不稳定）"; quickSort(intNumbers, currentOrder); break;
-                        case 5: cout << "归并排序（稳定）"; mergeSort(intNumbers, currentOrder); break;
-                        default: cout << "无效选择"; continue;
+
+                        if (useVisualization) {
+                            initVisualizationWindow();
+                            // 显示初始状态
+                            drawVisualization(intNumbers);
+
+                            switch (sortChoice) {
+                            case 1:
+                                cout << "正在使用冒泡排序（稳定）进行可视化排序...";
+                                bubbleSortVisual(intNumbers, currentOrder);
+                                break;
+                            case 2:
+                                cout << "正在使用插入排序（稳定）进行可视化排序...";
+                                insertionSortVisual(intNumbers, currentOrder);
+                                break;
+                            case 3:
+                                cout << "正在使用选择排序（不稳定）进行可视化排序...";
+                                selectionSortVisual(intNumbers, currentOrder);
+                                break;
+                            case 4:
+                                cout << "正在使用快速排序（不稳定）...";
+                                quickSort(intNumbers, currentOrder);
+                                break;
+                            case 5:
+                                cout << "正在使用归并排序（稳定）...";
+                                mergeSort(intNumbers, currentOrder);
+                                break;
+                            default:
+                                cout << "无效选择";
+                                continue;
+                            }
+
+                            // 显示最终状态
+                            drawVisualization(intNumbers);
+                            // 保持窗口打开一段时间
+                            sf::sleep(sf::seconds(2));
+                            closeVisualizationWindow();
                         }
+                        else {
+                            cout << "正在使用";
+                            switch (sortChoice) {
+                            case 1: cout << "冒泡排序（稳定）"; bubbleSort(intNumbers, currentOrder); break;
+                            case 2: cout << "插入排序（稳定）"; insertionSort(intNumbers, currentOrder); break;
+                            case 3: cout << "选择排序（不稳定）"; selectionSort(intNumbers, currentOrder); break;
+                            case 4: cout << "快速排序（不稳定）"; quickSort(intNumbers, currentOrder); break;
+                            case 5: cout << "归并排序（稳定）"; mergeSort(intNumbers, currentOrder); break;
+                            default: cout << "无效选择"; continue;
+                            }
+                            cout << "进行排序……" << endl;
+                        }
+
                         auto endTime = chrono::high_resolution_clock::now();
                         sortTime = chrono::duration_cast<chrono::microseconds>(endTime - startTime).count();
 
-                        cout << "进行排序……" << endl;
                         cout << "排序后：";
                         outputNumbers(intNumbers);
-                        cout << "性能统计：排序耗时 " << sortTime << " 微秒" << endl;
+                        if (!useVisualization) {  // 只有非可视化时才显示耗时
+                            cout << "性能统计：排序耗时 " << sortTime << " 微秒" << endl;
+                        }
                         askToSaveSortedData(intNumbers, TYPE_INT);
                         break;
                     }
                     else if (currentDataType == TYPE_DOUBLE) {
                         outputNumbers(doubleNumbers);
-                        checkMemorySafe(doubleNumbers);     
+                        checkMemorySafe(doubleNumbers);
                         cout << "正在使用";
 
                         long long sortTime = 0;
@@ -1070,12 +1400,24 @@ int main()	//放最后,就先不写声明了
 
             case 6: showAlgorithmComplexity(); break;
 
+            case 7:
+                visualizationEnabled = !visualizationEnabled;
+                if (visualizationEnabled) {
+                    cout << "可视化功能已启用（目前仅支持整数排序，只有冒泡、插入、选择排序）" << endl;
+                    cout << "注意：当排序整数数据时，可以选择是否使用可视化" << endl;
+                }
+                else {
+                    cout << "可视化功能已禁用" << endl;
+                    closeVisualizationWindow();
+                }
+                break;
+
             case 0:
                 cout << "感谢使用，再见！" << endl;
                 break;
 
             default:
-                cout << "无效选择，请输入0-6之间的数字！" << endl;
+                cout << "无效选择，请输入0-7之间的数字！" << endl;
             }
 
         }
@@ -1090,6 +1432,9 @@ int main()	//放最后,就先不写声明了
         }
 
     } while (mainChoice != 0);
+
+    // 确保关闭可视化窗口
+    closeVisualizationWindow();
     cout << "按回车退出..." << endl;
     cin.get();
     return 0;
