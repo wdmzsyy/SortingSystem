@@ -1,4 +1,5 @@
-﻿#include<iostream>
+﻿#define _CRT_SECURE_NO_WARNINGS
+#include<iostream>
 #include<vector>
 #include<string>    //getline函数需要
 #include<sstream>   //添加sstream用于字符串分隔
@@ -13,12 +14,19 @@
 #include <SFML/Window.hpp>
 using namespace std;
 
-sf::RenderWindow* visualWindow = nullptr;
-bool visualizationEnabled = false;
-const int WINDOW_WIDTH = 1200;  // 增加窗口宽度
-const int WINDOW_HEIGHT = 700;  // 增加窗口高度
-const int MIN_BAR_WIDTH = 2;    // 最小柱子宽度
-const int MAX_BAR_WIDTH = 20;   // 最大柱子宽度
+//TODO:把debug改为release
+//TODO:代码重复度高
+vector<int> intNumbers;
+vector<double> doubleNumbers;
+vector<string> stringNumbers;
+
+enum DataType { TYPE_INT, TYPE_DOUBLE, TYPE_STRING };
+DataType currentDataType = TYPE_INT;    //默认一下
+enum SortOrder { ORDER_ASC, ORDER_DESC };  // 升序，降序
+SortOrder currentOrder = ORDER_ASC;
+
+const bool AUTO_SAVE_ENABLED = true;
+const string AUTOSAVE_FILENAME = "autosave.dat";
 
 class SimpleSortException {
 private:
@@ -28,13 +36,14 @@ public:
     string what() const { return message; }
 };
 
-enum DataType { TYPE_INT, TYPE_DOUBLE, TYPE_STRING };
-DataType currentDataType = TYPE_INT;    //默认一下
-enum SortOrder { ORDER_ASC, ORDER_DESC };  // 升序，降序
-SortOrder currentOrder = ORDER_ASC;
+sf::RenderWindow* visualWindow = nullptr;
+const int WINDOW_WIDTH = 1200;  // 增加窗口宽度
+const int WINDOW_HEIGHT = 700;  // 增加窗口高度
+const int MIN_BAR_WIDTH = 2;    // 最小柱子宽度
+const int MAX_BAR_WIDTH = 20;   // 最大柱子宽度
 
 void mainMenu() {
-    cout << "\n===== 排序系统 =====" << endl;
+    cout << "\n====== 排序系统 ======" << endl;
     cout << "当前数据类型: " << (currentDataType == TYPE_INT ? "整数" : (currentDataType == TYPE_DOUBLE ? "浮点数" : "字符串")) << endl;
     cout << "1.选择数据类型" << endl;
     cout << "2.输入数据（手动/随机）" << endl;
@@ -42,13 +51,13 @@ void mainMenu() {
     cout << "4.显示当前数据" << endl;
     cout << "5.文件操作（保存/加载）" << endl;
     cout << "6.查看算法复杂度" << endl;
-    cout << "7.启用/禁用可视化" << endl;
     cout << "0.退出系统" << endl;
     cout << "请选择: ";
 }
 
 void sortingMenu() {
-    cout << "\n===== 选择排序算法 =====" << endl;
+    cout << "\n====== 选择排序算法 ======" << endl;
+    cout << "注：只有整数类型的冒泡、插入、选择排序可以可视化……" << endl;
     cout << "1.冒泡排序（稳定）" << endl;
     cout << "2.插入排序（稳定）" << endl;
     cout << "3.选择排序（不稳定）" << endl;
@@ -60,7 +69,7 @@ void sortingMenu() {
 
 template<typename T>
 void drawVisualization(const vector<T>& data, int highlight1 = -1, int highlight2 = -1, int step = 0) {
-    if (!visualWindow || !visualizationEnabled) return;
+    if (!visualWindow) return;
 
     // 处理窗口事件
     sf::Event event;
@@ -200,7 +209,6 @@ void initVisualizationWindow() {
         delete visualWindow;
     }
     visualWindow = new sf::RenderWindow(sf::VideoMode(WINDOW_WIDTH, WINDOW_HEIGHT), "Sorting Visualization");
-    visualizationEnabled = true;
 }
 
 // 关闭可视化窗口
@@ -210,11 +218,10 @@ void closeVisualizationWindow() {
         delete visualWindow;
         visualWindow = nullptr;
     }
-    visualizationEnabled = false;
 }
 
 void selectDataType() {
-    cout << "\n===== 选择数据类型 =====" << endl;
+    cout << "\n====== 选择数据类型 ======" << endl;
     cout << "1.整数（int）" << endl;
     cout << "2.浮点数（double）" << endl;
     cout << "3.字符串（string）" << endl;
@@ -394,7 +401,7 @@ void checkMemorySafe(const vector<T>& data) {
 
 template<typename T>
 vector<T> generateRandomNumbers() {
-    vector<T> randomData; 
+    vector<T> randomData;
     cout << "请输入要生成的随机数据数量 (1-10000): ";
     string input;
     getline(cin, input);
@@ -421,42 +428,43 @@ vector<T> generateRandomNumbers() {
         count = 10;
     }
 
+    //先reverse预分配内存，一次性分配足够内存，避免多次扩容
+    randomData.reserve(count);
+
     // 根据数据类型生成随机数
     if constexpr (is_same_v<T, int>) {
-        // 生成随机整数，范围 0-999
         cout << "正在生成 " << count << " 个随机整数 (0-999)..." << endl;
         for (int i = 0; i < count; i++) {
-            randomData.push_back(rand() % 1000);
+            randomData.push_back(rand() % 1000);  
         }
         cout << "已生成 " << count << " 个随机整数" << endl;
     }
     else if constexpr (is_same_v<T, double>) {
-        // 生成随机浮点数，范围 0.0-99.99
         cout << "正在生成 " << count << " 个随机浮点数 (0.00-99.99)..." << endl;
         for (int i = 0; i < count; i++) {
             // 生成两位小数的浮点数
             double value = (rand() % 10000) / 100.0;
-            randomData.push_back(value);
+            randomData.push_back(value);  
         }
         cout << "已生成 " << count << " 个随机浮点数" << endl;
     }
     else if constexpr (is_same_v<T, string>) {
-        // 生成随机字符串
         const string chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
         cout << "正在生成 " << count << " 个随机字符串 (3-6个字母)..." << endl;
 
         for (int i = 0; i < count; i++) {
             int length = 3 + rand() % 4;  // 3-6个字符
             string randomStr;
+            randomStr.reserve(length); 
             for (int j = 0; j < length; j++) {
                 randomStr += chars[rand() % chars.size()];
             }
-            randomData.push_back(randomStr);
+            randomData.push_back(randomStr);  
         }
         cout << "已生成 " << count << " 个随机字符串" << endl;
     }
 
-    return randomData;
+    return randomData; 
 }
 
 template<typename T>
@@ -866,7 +874,7 @@ vector<T> loadFromFile(const string& filename) {
 
 template<typename T>
 void askToSaveSortedData(const vector<T>& data, DataType type) {
-    cout << "\n=== 是否保存排序结果？ ===" << endl;
+    cout << "\n===== 是否保存排序结果？ =====" << endl;
     cout << "1. 保存到文件" << endl;
     cout << "2. 不保存，继续操作" << endl;
     cout << "请选择 (直接回车不保存): ";
@@ -903,7 +911,7 @@ void askToSaveSortedData(const vector<T>& data, DataType type) {
 }
 
 void showAlgorithmComplexity() {
-    cout << "\n===== 排序算法复杂度 =====" << endl;
+    cout << "\n====== 排序算法复杂度 ======" << endl;
     cout << "1.冒泡排序：" << endl;
     cout << "     时间复杂度：平均O(n²)，最坏O(n²)，最好O(n)" << endl;
     cout << "     空间复杂度：O(1)" << endl;
@@ -930,12 +938,166 @@ void showAlgorithmComplexity() {
     cout << "     稳定性：稳定" << endl;
 }
 
+
+// 自动保存当前状态（在每次操作后调用）
+void autoSave() {
+    const string tmpFile = AUTOSAVE_FILENAME + ".tmp";
+    const string finalFile = AUTOSAVE_FILENAME;
+    remove(tmpFile.c_str());
+
+    // 创建独立作用域，确保 ofstream 被强制关闭
+    {
+        ofstream ofs(tmpFile, ios::binary); 
+        if (!ofs) {
+            throw SimpleSortException("无法创建临时文件: " + tmpFile);
+        }
+
+        if (currentDataType == TYPE_INT) {
+            ofs << "INT\n" << (currentOrder == ORDER_ASC ? "ASC" : "DESC") << "\n";
+            ofs << intNumbers.size() << "\n";
+            for (const auto& x : intNumbers) ofs << x << " ";
+        }
+        else if (currentDataType == TYPE_DOUBLE) {
+            ofs << "DOUBLE\n" << (currentOrder == ORDER_ASC ? "ASC" : "DESC") << "\n";
+            ofs << doubleNumbers.size() << "\n";
+            for (const auto& x : doubleNumbers) ofs << x << " ";
+        }
+        else {
+            ofs << "STRING\n" << (currentOrder == ORDER_ASC ? "ASC" : "DESC") << "\n";
+            ofs << stringNumbers.size() << "\n";
+            for (const auto& x : stringNumbers) {
+                string escaped = x;
+                for (char& c : escaped) {
+                    if (c == ' ') c = '\x01';
+                    if (c == '\n') c = '\x02';
+                }
+                ofs << escaped << "\n"; 
+            }
+        }
+        ofs << "\n";  
+
+        // 强制刷盘并检查错误
+        ofs.flush();
+        if (!ofs.good()) {
+            throw SimpleSortException("写入数据失败");
+        }
+    }  
+
+    // 在文件完全关闭后，执行原子重命名，先删除目标文件
+    remove(finalFile.c_str());
+    int result = rename(tmpFile.c_str(), finalFile.c_str());
+    // 检查重命名结果
+    if (result != 0) {
+        int err = errno;
+        string errorMsg = "无法完成保存，错误 " + to_string(err) + ": " + strerror(err);
+        // Windows 常见错误 13 = 权限拒绝（文件被占用）
+        throw SimpleSortException(errorMsg);
+    }
+}
+
+// 程序启动时加载自动保存的数据
+bool autoLoad() {
+    ifstream ifs(AUTOSAVE_FILENAME.c_str());
+    if (!ifs.is_open()) return false;
+
+    try {
+        string typeStr, orderStr;
+        size_t count;
+
+        // 读取类型
+        if (!getline(ifs, typeStr)) return false;
+        if (typeStr == "INT") currentDataType = TYPE_INT;
+        else if (typeStr == "DOUBLE") currentDataType = TYPE_DOUBLE;
+        else if (typeStr == "STRING") currentDataType = TYPE_STRING;
+        else return false;
+
+        // 读取顺序
+        if (!getline(ifs, orderStr)) return false;
+        currentOrder = (orderStr == "ASC") ? ORDER_ASC : ORDER_DESC;
+
+        // 读取个数
+        if (!(ifs >> count)) return false;
+        ifs.ignore(numeric_limits<streamsize>::max(), '\n'); // 跳过换行
+
+        // 读取数据
+        if (currentDataType == TYPE_INT) {
+            intNumbers.clear();
+            intNumbers.reserve(count);
+            for (size_t i = 0; i < count; ++i) {
+                int x; ifs >> x;
+                intNumbers.push_back(x);
+            }
+        }
+        else if (currentDataType == TYPE_DOUBLE) {
+            doubleNumbers.clear();
+            doubleNumbers.reserve(count);
+            for (size_t i = 0; i < count; ++i) {
+                double x; ifs >> x;
+                doubleNumbers.push_back(x);
+            }
+        }
+        else {
+            stringNumbers.clear();
+            stringNumbers.reserve(count);
+            ifs.ignore(); 
+            for (size_t i = 0; i < count; ++i) {
+                string x;
+                getline(ifs, x);
+                for (char& c : x) {
+                    if (c == '\x01') c = ' ';
+                    if (c == '\x02') c = '\n';
+                }
+                if (!x.empty()) stringNumbers.push_back(move(x));
+            }
+        }
+
+        cout << "已自动恢复上次的数据：" << " 类型: " << typeStr << "，数量: " << count << endl;
+        return true;
+    }
+    catch (const exception& e) {
+        cerr << "自动加载失败，启动空数据: " << e.what() << endl;
+        // 清空数据防止半加载状态
+        intNumbers.clear(); doubleNumbers.clear(); stringNumbers.clear();
+        return false;
+    }
+}
+
 int main() {
     srand(time(nullptr));
     cout << "欢迎使用排序系统（支持整数/浮点数/字符串）" << endl;
-    vector<int> intNumbers;
-    vector<double> doubleNumbers;
-    vector<string> stringNumbers;
+   
+    ifstream test(AUTOSAVE_FILENAME);
+    if (test.is_open()) {
+        test.seekg(0, ios::end);
+        size_t size = test.tellg();
+        cout << "发现 " << AUTOSAVE_FILENAME
+            << "，大小 " << size << " 字节" << endl;
+        if (size == 0) {
+            cout << "报告：自动保存文件为空！" << endl;
+        }
+        test.close();
+    }
+    else {
+        cout << "报告：自动保存文件不存在" << endl;
+    }
+
+    //立即加载数据
+    if (autoLoad()) {
+        cout << "已自动加载上次的数据！" << endl;
+        // 显示加载了什么数据
+        if (currentDataType == TYPE_INT) {
+            cout << "当前有 " << intNumbers.size() << " 个整数" << endl;
+        }
+        else if (currentDataType == TYPE_DOUBLE) {
+            cout << "当前有 " << doubleNumbers.size() << " 个浮点数" << endl;
+        }
+        else {
+            cout << "当前有 " << stringNumbers.size() << " 个字符串" << endl;
+        }
+    }
+    else {
+        cout << "未找到可加载的数据，请手动输入" << endl;
+    }
 
     int mainChoice = 0;
     do {
@@ -959,7 +1121,7 @@ int main() {
             }
 
             switch (mainChoice) {
-            case 1: selectDataType(); break;
+            case 1: selectDataType(); autoSave(); break;
             case 2:  // 输入数据
             {
                 cout << "\n--- 输入数据 ---" << endl;
@@ -1029,7 +1191,7 @@ int main() {
                         stringNumbers = inputNumbers<string>();
                     }
                 }
-
+                autoSave();
                 break;
             }
 
@@ -1068,7 +1230,7 @@ int main() {
                     break;
                 }
 
-                cout << "\n===== 选择排序方向 =====" << endl;
+                cout << "\n====== 选择排序方向 ======" << endl;
                 cout << "1. 升序（从小到大）" << endl;
                 cout << "2. 降序（从大到小）" << endl;
                 cout << "请选择（直接回车使用默认升序）: ";
@@ -1095,14 +1257,13 @@ int main() {
                 }
 
                 bool useVisualization = false;
-                if (visualizationEnabled && currentDataType == TYPE_INT) {
-                    cout << "\n启用可视化？(y/n，或者直接回车启用): ";
+                if (currentDataType == TYPE_INT && sortChoice >= 1 && sortChoice <= 3) {
+                    cout << "\n是否为当前排序启用可视化？(y/n，或直接回车跳过): ";
                     string visInput;
                     getline(cin, visInput);
-                    if (visInput.empty() || visInput == "y" || visInput == "Y") {
+                    if (!visInput.empty() && (visInput == "y" || visInput == "Y")) {
                         useVisualization = true;
-                        cout << "已启用可视化……将弹出窗口显示排序过程" << endl;
-                        cout << "注意：可视化窗口会在排序结束后自动关闭" << endl;
+                        cout << "已启用可视化...准备显示排序过程" << endl;
                     }
                 }
 
@@ -1120,36 +1281,17 @@ int main() {
                             // 显示初始状态
                             drawVisualization(intNumbers);
 
+                            cout << "正在使用";
                             switch (sortChoice) {
-                            case 1:
-                                cout << "正在使用冒泡排序（稳定）进行可视化排序...";
-                                bubbleSortVisual(intNumbers, currentOrder);
-                                break;
-                            case 2:
-                                cout << "正在使用插入排序（稳定）进行可视化排序...";
-                                insertionSortVisual(intNumbers, currentOrder);
-                                break;
-                            case 3:
-                                cout << "正在使用选择排序（不稳定）进行可视化排序...";
-                                selectionSortVisual(intNumbers, currentOrder);
-                                break;
-                            case 4:
-                                cout << "正在使用快速排序（不稳定）...";
-                                quickSort(intNumbers, currentOrder);
-                                break;
-                            case 5:
-                                cout << "正在使用归并排序（稳定）...";
-                                mergeSort(intNumbers, currentOrder);
-                                break;
-                            default:
-                                cout << "无效选择";
-                                continue;
+                            case 1: cout << "冒泡排序（稳定）可视化"; bubbleSortVisual(intNumbers, currentOrder); break;
+                            case 2: cout << "插入排序（稳定）可视化"; insertionSortVisual(intNumbers, currentOrder); break;
+                            case 3: cout << "选择排序（不稳定）可视化"; selectionSortVisual(intNumbers, currentOrder); break;
+                            case 4: cout << "快速排序（不稳定）"; quickSort(intNumbers, currentOrder); break;
+                            case 5: cout << "归并排序（稳定）"; mergeSort(intNumbers, currentOrder); break;
+                            default: cout << "无效选择"; continue;
                             }
-
-                            // 显示最终状态
-                            drawVisualization(intNumbers);
-                            // 保持窗口打开一段时间
-                            sf::sleep(sf::seconds(2));
+                            drawVisualization(intNumbers);  // 显示最终状态
+                            sf::sleep(sf::seconds(2));      // 保持窗口2秒
                             closeVisualizationWindow();
                         }
                         else {
@@ -1173,6 +1315,7 @@ int main() {
                         if (!useVisualization) {  // 只有非可视化时才显示耗时
                             cout << "性能统计：排序耗时 " << sortTime << " 微秒" << endl;
                         }
+                        autoSave();
                         askToSaveSortedData(intNumbers, TYPE_INT);
                         break;
                     }
@@ -1198,7 +1341,7 @@ int main() {
                         cout << "排序后: ";
                         outputNumbers(doubleNumbers);
                         cout << "性能统计：排序耗时 " << sortTime << " 微秒" << endl;
-
+                        autoSave();
                         askToSaveSortedData(doubleNumbers, TYPE_DOUBLE);
                         break;
                     }
@@ -1224,7 +1367,7 @@ int main() {
                         cout << "排序后：";
                         outputNumbers(stringNumbers);
                         cout << "性能统计：排序耗时 " << sortTime << " 微秒" << endl;
-
+                        autoSave();
                         askToSaveSortedData(stringNumbers, TYPE_STRING);
                         break;
                     }
@@ -1262,7 +1405,7 @@ int main() {
             {
                 int fileChoice;
                 do {
-                    cout << "\n===== 文件操作菜单 =====" << endl;
+                    cout << "\n====== 文件操作菜单 ======" << endl;
                     cout << "1. 保存当前数据到文件" << endl;
                     cout << "2. 从文件加载数据" << endl;
                     cout << "3. 保存排序结果" << endl;
@@ -1400,18 +1543,6 @@ int main() {
 
             case 6: showAlgorithmComplexity(); break;
 
-            case 7:
-                visualizationEnabled = !visualizationEnabled;
-                if (visualizationEnabled) {
-                    cout << "可视化功能已启用（目前仅支持整数排序，只有冒泡、插入、选择排序）" << endl;
-                    cout << "注意：当排序整数数据时，可以选择是否使用可视化" << endl;
-                }
-                else {
-                    cout << "可视化功能已禁用" << endl;
-                    closeVisualizationWindow();
-                }
-                break;
-
             case 0:
                 cout << "感谢使用，再见！" << endl;
                 break;
@@ -1429,6 +1560,13 @@ int main() {
         }
         catch (...) {
             cout << "未知错误发生" << endl;
+        }
+
+        try {
+            autoSave();
+        }
+        catch (...) {
+            // 保存失败不影响主流程
         }
 
     } while (mainChoice != 0);
