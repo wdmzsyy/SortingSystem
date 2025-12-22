@@ -28,10 +28,11 @@ void mainMenu() {
     cout << "\n===== 排序系统 =====" << endl;
     cout << "当前数据类型: " << (currentDataType == TYPE_INT ? "整数" : (currentDataType == TYPE_DOUBLE ? "浮点数" : "字符串")) << endl;
     cout << "1.选择数据类型" << endl;
-    cout << "2.输入数据" << endl;
+    cout << "2.输入数据（手动/随机）" << endl;
     cout << "3.选择排序算法并执行" << endl;
     cout << "4.显示当前数据" << endl;
     cout << "5.文件操作（保存/加载）" << endl;
+    cout << "6.查看算法复杂度" << endl;
     cout << "0.退出系统" << endl;
     cout << "请选择: ";
 }
@@ -225,6 +226,77 @@ void checkMemorySafe(const vector<T>& data) {
             throw SimpleSortException("用户取消了大数据排序");
         }
     }
+}
+
+// ============ 随机数生成函数 ============
+template<typename T>
+vector<T> generateRandomNumbers() {
+    vector<T> randomData;
+
+    // 询问生成数量
+    cout << "请输入要生成的随机数据数量 (1-10000): ";
+
+    string input;
+    getline(cin, input);
+
+    if (input.empty()) {
+        cout << "没有输入数量，默认生成10个随机数" << endl;
+        input = "10";
+    }
+
+    int count = 10;  // 默认值
+    try {
+        count = stoi(input);
+        if (count <= 0) {
+            cout << "数量必须大于0，使用默认值10" << endl;
+            count = 10;
+        }
+        if (count > 10000) {
+            cout << "数量太大，限制为10000" << endl;
+            count = 10000;
+        }
+    }
+    catch (...) {
+        cout << "输入无效，使用默认值10" << endl;
+        count = 10;
+    }
+
+    // 根据数据类型生成随机数
+    if constexpr (is_same_v<T, int>) {
+        // 生成随机整数，范围 0-999
+        cout << "正在生成 " << count << " 个随机整数 (0-999)..." << endl;
+        for (int i = 0; i < count; i++) {
+            randomData.push_back(rand() % 1000);
+        }
+        cout << "✓ 已生成 " << count << " 个随机整数" << endl;
+    }
+    else if constexpr (is_same_v<T, double>) {
+        // 生成随机浮点数，范围 0.0-99.99
+        cout << "正在生成 " << count << " 个随机浮点数 (0.00-99.99)..." << endl;
+        for (int i = 0; i < count; i++) {
+            // 生成两位小数的浮点数
+            double value = (rand() % 10000) / 100.0;
+            randomData.push_back(value);
+        }
+        cout << "✓ 已生成 " << count << " 个随机浮点数" << endl;
+    }
+    else if constexpr (is_same_v<T, string>) {
+        // 生成随机字符串
+        const string chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
+        cout << "正在生成 " << count << " 个随机字符串 (3-6个字母)..." << endl;
+
+        for (int i = 0; i < count; i++) {
+            int length = 3 + rand() % 4;  // 3-6个字符
+            string randomStr;
+            for (int j = 0; j < length; j++) {
+                randomStr += chars[rand() % chars.size()];
+            }
+            randomData.push_back(randomStr);
+        }
+        cout << "✓ 已生成 " << count << " 个随机字符串" << endl;
+    }
+
+    return randomData;
 }
 
 template<typename T>
@@ -554,6 +626,34 @@ void askToSaveSortedData(const vector<T>& data, DataType type) {
     saveToFile(data, filename);
 }
 
+void showAlgorithmComplexity() {
+    cout << "\n===== 排序算法复杂度 =====" << endl;
+    cout << "1.冒泡排序：" << endl;
+    cout << "     时间复杂度：平均O(n²)，最坏O(n²)，最好O(n)" << endl;
+    cout << "     空间复杂度：O(1)" << endl;
+    cout << "     稳定性：稳定" << endl;
+
+    cout << "2.插入排序：" << endl;
+    cout << "     时间复杂度：平均O(n²)，最坏O(n²)，最好O(n)" << endl;
+    cout << "     空间复杂度：O(1)" << endl;
+    cout << "     稳定性：稳定" << endl;
+
+    cout << "3.选择排序：" << endl;
+    cout << "     时间复杂度：O(n²)" << endl;
+    cout << "     空间复杂度：O(1)" << endl;
+    cout << "     稳定性：不稳定" << endl;
+
+    cout << "4.快速排序：" << endl;
+    cout << "     时间复杂度：平均O(nlog2 n)，最坏O(n²)，最好O(nlog2 n)" << endl;
+    cout << "     空间复杂度：O(log2 n)" << endl;
+    cout << "     稳定性：不稳定" << endl;
+
+    cout << "5.归并排序：" << endl;
+    cout << "     时间复杂度：O(nlog2 n)" << endl;
+    cout << "     空间复杂度：O(n)" << endl;
+    cout << "     稳定性：稳定" << endl;
+}
+
 int main()	//放最后,就先不写声明了
 {
     srand(time(nullptr));
@@ -585,23 +685,82 @@ int main()	//放最后,就先不写声明了
 
             switch (mainChoice) {
             case 1: selectDataType(); break;
-            case 2:
+            case 2:  // 输入数据
+            {
                 cout << "\n--- 输入数据 ---" << endl;
                 cout << "当前数据类型: " << (currentDataType == TYPE_INT ? "整数" :
                     (currentDataType == TYPE_DOUBLE ? "浮点数" : "字符串")) << endl;
-                if (currentDataType == TYPE_INT) {
-                    intNumbers = inputNumbers<int>();
+
+                cout << "\n选择输入方式:" << endl;
+                cout << "1. 手动输入（空格分隔）" << endl;
+                cout << "2. 生成随机数据" << endl;
+                cout << "请选择: ";
+
+                string choiceInput;
+                getline(cin, choiceInput);
+
+                int choice = 1;  // 默认手动输入
+
+                if (!choiceInput.empty()) {
+                    try {
+                        choice = stoi(choiceInput);
+                    }
+                    catch (...) {
+                        cout << "输入无效，使用手动输入" << endl;
+                        choice = 1;
+                    }
                 }
-                else if (currentDataType == TYPE_DOUBLE) {
-                    doubleNumbers = inputNumbers<double>();
+
+                if (choice == 1) {
+                    // 手动输入
+                    if (currentDataType == TYPE_INT) {
+                        intNumbers = inputNumbers<int>();
+                    }
+                    else if (currentDataType == TYPE_DOUBLE) {
+                        doubleNumbers = inputNumbers<double>();
+                    }
+                    else {
+                        stringNumbers = inputNumbers<string>();
+                    }
+                }
+                else if (choice == 2) {
+                    // 生成随机数据
+                    cout << "\n--- 生成随机数据 ---" << endl;
+                    if (currentDataType == TYPE_INT) {
+                        intNumbers = generateRandomNumbers<int>();
+                        cout << "生成的随机整数: ";
+                        outputNumbers(intNumbers);
+                    }
+                    else if (currentDataType == TYPE_DOUBLE) {
+                        doubleNumbers = generateRandomNumbers<double>();
+                        cout << "生成的随机浮点数: ";
+                        outputNumbers(doubleNumbers);
+                    }
+                    else {
+                        stringNumbers = generateRandomNumbers<string>();
+                        cout << "生成的随机字符串: ";
+                        outputNumbers(stringNumbers);
+                    }
                 }
                 else {
-                    stringNumbers = inputNumbers<string>();
+                    cout << "无效选择，使用手动输入" << endl;
+                    if (currentDataType == TYPE_INT) {
+                        intNumbers = inputNumbers<int>();
+                    }
+                    else if (currentDataType == TYPE_DOUBLE) {
+                        doubleNumbers = inputNumbers<double>();
+                    }
+                    else {
+                        stringNumbers = inputNumbers<string>();
+                    }
                 }
+
                 break;
+            }
 
             case 3:
             {
+                currentOrder = ORDER_ASC; //复位
                 if ((currentDataType == TYPE_INT && intNumbers.empty()) ||
                     (currentDataType == TYPE_DOUBLE && doubleNumbers.empty()) ||
                     (currentDataType == TYPE_STRING && stringNumbers.empty())) {
@@ -664,10 +823,11 @@ int main()	//放最后,就先不写声明了
                 try {
                     if (currentDataType == TYPE_INT) {
                         outputNumbers(intNumbers);
-                        checkMemorySafe(intNumbers);
+                        checkMemorySafe(intNumbers); 
+                        cout << "正在使用";
+
                         long long sortTime = 0;
                         auto startTime = chrono::high_resolution_clock::now();
-                        cout << "正在使用";
                         switch (sortChoice) {
                         case 1: cout << "冒泡排序（稳定）"; bubbleSort(intNumbers, currentOrder); break;
                         case 2: cout << "插入排序（稳定）"; insertionSort(intNumbers, currentOrder); break;
@@ -676,11 +836,10 @@ int main()	//放最后,就先不写声明了
                         case 5: cout << "归并排序（稳定）"; mergeSort(intNumbers, currentOrder); break;
                         default: cout << "无效选择"; continue;
                         }
-                        cout << "进行排序……" << endl;
-
                         auto endTime = chrono::high_resolution_clock::now();
                         sortTime = chrono::duration_cast<chrono::microseconds>(endTime - startTime).count();
 
+                        cout << "进行排序……" << endl;
                         cout << "排序后：";
                         outputNumbers(intNumbers);
                         cout << "性能统计：排序耗时 " << sortTime << " 微秒" << endl;
@@ -689,10 +848,11 @@ int main()	//放最后,就先不写声明了
                     }
                     else if (currentDataType == TYPE_DOUBLE) {
                         outputNumbers(doubleNumbers);
-                        checkMemorySafe(doubleNumbers);
+                        checkMemorySafe(doubleNumbers);     
+                        cout << "正在使用";
+
                         long long sortTime = 0;
                         auto startTime = chrono::high_resolution_clock::now();
-                        cout << "正在使用";
                         switch (sortChoice) {
                         case 1: cout << "冒泡排序（稳定）"; bubbleSort(doubleNumbers, currentOrder); break;
                         case 2: cout << "插入排序（稳定）"; insertionSort(doubleNumbers, currentOrder); break;
@@ -701,11 +861,10 @@ int main()	//放最后,就先不写声明了
                         case 5: cout << "归并排序（稳定）"; mergeSort(doubleNumbers, currentOrder); break;
                         default: cout << "无效选择"; continue;
                         }
-                        cout << " 进行排序……" << endl;
-
                         auto endTime = chrono::high_resolution_clock::now();
                         sortTime = chrono::duration_cast<chrono::microseconds>(endTime - startTime).count();
 
+                        cout << " 进行排序……" << endl;
                         cout << "排序后: ";
                         outputNumbers(doubleNumbers);
                         cout << "性能统计：排序耗时 " << sortTime << " 微秒" << endl;
@@ -716,9 +875,10 @@ int main()	//放最后,就先不写声明了
                     else {
                         outputNumbers(stringNumbers);
                         checkMemorySafe(stringNumbers);
+                        cout << "正在使用";
+
                         long long sortTime = 0;
                         auto startTime = chrono::high_resolution_clock::now();
-                        cout << "正在使用";
                         switch (sortChoice) {
                         case 1: cout << "冒泡排序（稳定）"; bubbleSort(stringNumbers, currentOrder); break;
                         case 2: cout << "插入排序（稳定）"; insertionSort(stringNumbers, currentOrder); break;
@@ -727,11 +887,10 @@ int main()	//放最后,就先不写声明了
                         case 5: cout << "归并排序（稳定）"; mergeSort(stringNumbers, currentOrder); break;
                         default: cout << "无效选择"; continue;
                         }
-                        cout << "进行排序……" << endl;
-
                         auto endTime = chrono::high_resolution_clock::now();
                         sortTime = chrono::duration_cast<chrono::microseconds>(endTime - startTime).count();
 
+                        cout << "进行排序……" << endl;
                         cout << "排序后：";
                         outputNumbers(stringNumbers);
                         cout << "性能统计：排序耗时 " << sortTime << " 微秒" << endl;
@@ -909,12 +1068,14 @@ int main()	//放最后,就先不写声明了
                 break;
             }
 
+            case 6: showAlgorithmComplexity(); break;
+
             case 0:
                 cout << "感谢使用，再见！" << endl;
                 break;
 
             default:
-                cout << "无效选择，请输入0-5之间的数字！" << endl;
+                cout << "无效选择，请输入0-6之间的数字！" << endl;
             }
 
         }
